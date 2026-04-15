@@ -83,7 +83,7 @@ export async function GET(request: Request): Promise<Response> {
 
 		upstreamHeaders.set(
 			"User-Agent",
-			"Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:25.0) Gecko/20100101 Firefox/25.0",
+			request.headers.get("User-Agent") || "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:25.0) Gecko/20100101 Firefox/25.0",
 		);
 		upstreamHeaders.set("Accept", "*/*");
 		upstreamHeaders.set("Referer", `${targetUrl.origin}/`);
@@ -98,6 +98,8 @@ export async function GET(request: Request): Promise<Response> {
 
 		if (!upstream.ok && upstream.status !== 206) {
 			const body = await upstream.text().catch(() => "");
+
+			console.error(`Upstream request failed with status ${upstream.status}: ${body.slice(0, 500)}`);
 
 			return NextResponse.json(
 				{
