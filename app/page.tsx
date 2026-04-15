@@ -7,29 +7,14 @@ import Player from "@/components/Player";
 
 const Page = styled.main`
     min-height: 100vh;
-    display: grid;
-    grid-template-columns: 340px 1fr;
     background: #0f1115;
     color: #fff;
-
-    @media (max-width: 900px) {
-        grid-template-columns: 1fr;
-    }
+    padding: 1rem;
 `;
 
-const Sidebar = styled.aside`
-    border-right: 1px solid rgba(255, 255, 255, 0.08);
-    padding: 1rem;
-    overflow: auto;
-
-    @media (max-width: 900px) {
-        border-right: 0;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    }
-`;
-
-const Content = styled.section`
-    padding: 1rem;
+const Container = styled.div`
+    max-width: 1400px;
+    margin: 0 auto;
     display: flex;
     flex-direction: column;
     gap: 1rem;
@@ -40,6 +25,38 @@ const Card = styled.div`
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 16px;
     padding: 1rem;
+    overflow: hidden;
+`;
+
+const HeaderCard = styled(Card)`
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+`;
+
+const MainGrid = styled.div`
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.9fr);
+    gap: 1rem;
+    align-items: start;
+
+    @media (max-width: 1100px) {
+        grid-template-columns: 1fr;
+    }
+`;
+
+const LeftColumn = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0;
+`;
+
+const RightColumn = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0;
 `;
 
 const Tabs = styled.div`
@@ -55,6 +72,10 @@ const TabButton = styled.button<{ $active: boolean }>`
     cursor: pointer;
     background: ${({ $active }) => ($active ? "#2d6cdf" : "#242936")};
     color: #fff;
+
+    &:hover {
+        opacity: 0.92;
+    }
 `;
 
 const Input = styled.input`
@@ -74,12 +95,49 @@ const Button = styled.button`
     background: #2d6cdf;
     color: #fff;
     font-weight: 600;
+
+    &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
 `;
 
 const FieldGroup = styled.div`
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+`;
+
+const PlayerWrap = styled.div`
+    aspect-ratio: 16 / 9;
+    min-height: 320px;
+    background: #000;
+    border-radius: 14px;
+    overflow: hidden;
+`;
+
+const ErrorText = styled.p`
+    color: #ff7b7b;
+    margin: 0.75rem 0 0 0;
+`;
+
+const Empty = styled.div`
+    display: grid;
+    place-items: center;
+    min-height: 320px;
+    border-radius: 16px;
+    background: #171a21;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+`;
+
+const CategorySearchInput = styled.input`
+	width: 100%;
+	padding: 0.8rem 0.95rem;
+	border-radius: 10px;
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	background: #0f1115;
+	color: #fff;
+	margin-bottom: 0.75rem;
 `;
 
 const CategoryList = styled.div`
@@ -98,50 +156,58 @@ const CategoryButton = styled.button<{ $active: boolean }>`
 `;
 
 const SearchInput = styled.input`
-    width: 100%;
-    padding: 0.8rem 0.95rem;
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: #0f1115;
-    color: #fff;
-    margin-top: 0.75rem;
+	width: 100%;
+	padding: 0.8rem 0.95rem;
+	border-radius: 10px;
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	background: #0f1115;
+	color: #fff;
+	margin-top: 0.75rem;
+`;
+
+const ChannelsCard = styled(Card)`
+	padding: 0;
+`;
+
+const ChannelsHeader = styled.div`
+	padding: 1rem 1rem 0.75rem 1rem;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 `;
 
 const ChannelList = styled.div`
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    margin-top: 1rem;
+	display: flex;
+	flex-direction: column;
+	max-height: 70vh;
+	overflow: auto;
+	padding: 0.75rem;
+
+	@media (max-width: 1100px) {
+		max-height: 45vh;
+	}
 `;
 
 const ChannelButton = styled.button<{ $active: boolean }>`
-    width: 100%;
-    text-align: left;
-    border: 1px solid ${({ $active }) => ($active ? "#2d6cdf" : "rgba(255,255,255,0.08)")};
-    border-radius: 12px;
-    padding: 0.85rem;
-    cursor: pointer;
-    background: ${({ $active }) => ($active ? "rgba(45,108,223,0.2)" : "#171a21")};
-    color: #fff;
+	width: 100%;
+	text-align: left;
+	border: 1px solid ${({ $active }) => ($active ? "#2d6cdf" : "rgba(255,255,255,0.08)")};
+	border-radius: 12px;
+	padding: 0.85rem;
+	cursor: pointer;
+	background: ${({ $active }) => ($active ? "rgba(45,108,223,0.2)" : "#171a21")};
+	color: #fff;
+	margin-bottom: 0.5rem;
+
+	&:last-child {
+		margin-bottom: 0;
+	}
 `;
 
-const PlayerWrap = styled.div`
-    aspect-ratio: 16 / 9;
-    min-height: 320px;
+const ChannelName = styled.div`
+	font-weight: 600;
 `;
 
-const ErrorText = styled.p`
-    color: #ff7b7b;
-`;
-
-const Empty = styled.div`
-	display: grid;
-	place-items: center;
-	height: 100%;
-	min-height: 320px;
-	border-radius: 16px;
-	background: #171a21;
-	border: 1px solid rgba(255, 255, 255, 0.08);
+const ChannelMeta = styled.small`
+	opacity: 0.7;
 `;
 
 const PlaylistForm = observer(() => {
@@ -188,36 +254,56 @@ const XtreamForm = observer(() => {
 const HomePage = observer(function HomePage() {
 	return (
 		<Page>
-			<Sidebar>
-				<Card>
-					<Tabs>
-						<TabButton
-							$active={iptvStore.sourceType === "playlist"}
-							onClick={() => {
-								iptvStore.sourceType = "playlist";
-							}}
-						>
-							Playlist
-						</TabButton>
+			<Container>
+				<HeaderCard>
+					<h1 style={{ margin: 0 }}>IPTV Player</h1>
+					<p style={{ margin: 0, opacity: 0.75 }}>
+						Load a playlist or login with Xtream, then pick a channel.
+					</p>
+				</HeaderCard>
 
-						<TabButton
-							$active={iptvStore.sourceType === "xtream"}
-							onClick={() => {
-								iptvStore.sourceType = "xtream";
-							}}
-						>
-							Xtream
-						</TabButton>
-					</Tabs>
+				<MainGrid>
+					<LeftColumn>
+						{iptvStore.selectedChannel ? (
+							<Card>
+								<h2 style={{ marginTop: 0 }}>{iptvStore.selectedChannel.name}</h2>
+								<PlayerWrap>
+									<Player src={iptvStore.selectedChannel.streamUrl} />
+								</PlayerWrap>
+							</Card>
+						) : (
+							<Empty>Select a playlist and choose a channel.</Empty>
+						)}
 
-					{iptvStore.sourceType === "playlist" ? <PlaylistForm /> : <XtreamForm />}
-
-					{iptvStore.error ? <ErrorText>{iptvStore.error}</ErrorText> : null}
-				</Card>
-
-				{iptvStore.channels.length > 0 ? (
-					<>
 						<Card>
+							<Tabs>
+								<TabButton
+									$active={iptvStore.sourceType === "playlist"}
+									onClick={() => iptvStore.setSourceType("playlist")}>
+									Playlist
+								</TabButton>
+
+								<TabButton
+									$active={iptvStore.sourceType === "xtream"}
+									onClick={() => iptvStore.setSourceType("xtream")}>
+									Xtream
+								</TabButton>
+							</Tabs>
+
+							{iptvStore.sourceType === "playlist" ? <PlaylistForm /> : <XtreamForm />}
+
+							{iptvStore.error ? <ErrorText>{iptvStore.error}</ErrorText> : null}
+						</Card>
+					</LeftColumn>
+
+					<RightColumn>
+						<Card>
+							<CategorySearchInput
+								placeholder="Search categories..."
+								value={iptvStore.categorySearch}
+								onChange={(event) => iptvStore.setCategorySearch(event.target.value)}
+							/>
+
 							<CategoryList>
 								{iptvStore.visibleCategories.map((category) => (
 									<CategoryButton
@@ -235,49 +321,33 @@ const HomePage = observer(function HomePage() {
 								value={iptvStore.search}
 								onChange={(event) => iptvStore.setSearch(event.target.value)}
 							/>
-
-							<p style={{ opacity: 0.7, marginTop: "0.75rem", marginBottom: 0 }}>
-								{iptvStore.filteredChannels.length} channels
-							</p>
 						</Card>
 
-						<ChannelList>
-							{iptvStore.filteredChannels.map((channel) => (
-								<ChannelButton
-									key={channel.id}
-									$active={iptvStore.selectedChannel?.id === channel.id}
-									onClick={() => iptvStore.selectChannel(channel)}
-								>
-									<div>{channel.name}</div>
-									{channel.categoryName ? (
-										<small style={{ opacity: 0.7 }}>{channel.categoryName}</small>
-									) : null}
-								</ChannelButton>
-							))}
-						</ChannelList>
-					</>
-				) : null}
-			</Sidebar>
+						<ChannelsCard>
+							<ChannelsHeader>
+								<p style={{ margin: 0, opacity: 0.7 }}>
+									{iptvStore.filteredChannels.length} channels
+								</p>
+							</ChannelsHeader>
 
-			<Content>
-				<Card>
-					<h1 style={{ marginTop: 0, marginBottom: "0.5rem" }}>IPTV Player</h1>
-					<p style={{ margin: 0, opacity: 0.75 }}>
-						Load a playlist or login with Xtream, then pick a channel.
-					</p>
-				</Card>
-
-				{iptvStore.selectedChannel ? (
-					<Card>
-						<h2 style={{ marginTop: 0 }}>{iptvStore.selectedChannel.name}</h2>
-						<PlayerWrap>
-							<Player src={iptvStore.selectedChannel.streamUrl} />
-						</PlayerWrap>
-					</Card>
-				) : (
-					<Empty>Select a playlist and choose a channel.</Empty>
-				)}
-			</Content>
+							<ChannelList>
+								{iptvStore.filteredChannels.map((channel) => (
+									<ChannelButton
+										key={channel.id}
+										$active={iptvStore.selectedChannel?.id === channel.id}
+										onClick={() => iptvStore.selectChannel(channel)}
+									>
+										<ChannelName>{channel.name}</ChannelName>
+										{channel.categoryName ? (
+											<ChannelMeta>{channel.categoryName}</ChannelMeta>
+										) : null}
+									</ChannelButton>
+								))}
+							</ChannelList>
+						</ChannelsCard>
+					</RightColumn>
+				</MainGrid>
+			</Container>
 		</Page>
 	);
 });

@@ -11,6 +11,7 @@ class IPTVStore {
 	@observable error = "";
 	@observable playlistUrl = "";
 	@observable search = "";
+	@observable categorySearch = "";
 	@observable xtreamCredentials: XtreamCredentials = {
 		server: "",
 		username: "",
@@ -21,7 +22,8 @@ class IPTVStore {
 		makeObservable(this);
 	}
 
-	set sourceType(sourceType: SourceType) {
+	@action.bound
+	setSourceType(sourceType: SourceType): void {
 		this._sourceType = sourceType;
 		this.error = "";
 	}
@@ -32,18 +34,18 @@ class IPTVStore {
 	}
 
 	@action.bound
+	setPlaylistUrl(value: string): void {
+		this.playlistUrl = value;
+	}
+
+	@action.bound
 	setSearch(value: string): void {
 		this.search = value;
 	}
 
 	@action.bound
-	setXtreamField<K extends keyof XtreamCredentials>(key: K, value: XtreamCredentials[K]): void {
-		this.xtreamCredentials[key] = value;
-	}
-
-	@action.bound
-	setPlaylistUrl(value: string): void {
-		this.playlistUrl = value;
+	setCategorySearch(value: string): void {
+		this.categorySearch = value;
 	}
 
 	@action.bound
@@ -54,6 +56,11 @@ class IPTVStore {
 	@action.bound
 	selectChannel(channel: Channel): void {
 		this.selectedChannel = channel;
+	}
+
+	@action.bound
+	setXtreamField<K extends keyof XtreamCredentials>(key: K, value: XtreamCredentials[K]): void {
+		this.xtreamCredentials[key] = value;
 	}
 
 	@computed
@@ -73,7 +80,16 @@ class IPTVStore {
 
 	@computed
 	get visibleCategories(): Category[] {
-		return [{ id: "all", name: "All" }, ...this.categories];
+		const search = this.categorySearch.trim().toLowerCase();
+		const categories = [{ id: "all", name: "All" }, ...this.categories];
+
+		if (!search) {
+			return categories;
+		}
+
+		return categories.filter((category) =>
+			category.name.toLowerCase().includes(search),
+		);
 	}
 
 	@action.bound
@@ -112,6 +128,7 @@ class IPTVStore {
 				this.channels = data.channels || [];
 				this.selectedCategoryId = "all";
 				this.search = "";
+				this.categorySearch = "";
 				this.selectedChannel = data.channels?.[0] || null;
 			});
 		} catch (error) {
@@ -161,6 +178,7 @@ class IPTVStore {
 				this.channels = data.channels || [];
 				this.selectedCategoryId = "all";
 				this.search = "";
+				this.categorySearch = "";
 				this.selectedChannel = data.channels?.[0] || null;
 			});
 		} catch (error) {
