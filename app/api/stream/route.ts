@@ -66,11 +66,6 @@ function copyHeaderIfPresent(from: Headers, to: Headers, name: string): void {
 }
 
 export async function GET(request: Request): Promise<Response> {
-	const startedAt = Date.now();
-
-	const controller = new AbortController();
-	const timeoutId = setTimeout(() => controller.abort(), 10000);
-
 	try {
 		const url = new URL(request.url);
 		const target = url.searchParams.get("url")?.trim();
@@ -84,20 +79,12 @@ export async function GET(request: Request): Promise<Response> {
 		}
 
 		const upstreamHeaders = new Headers();
+		const targetUrl = new URL(target);
+
 		upstreamHeaders.set(
 			"User-Agent",
 			"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
 		);
-		upstreamHeaders.set("Accept", "*/*");
-
-		const targetUrl = new URL(target);
-		upstreamHeaders.set("Referer", `${targetUrl.origin}/`);
-		upstreamHeaders.set("Origin", targetUrl.origin);
-		const accept = request.headers.get("accept");
-		const range = request.headers.get("range");
-
-		upstreamHeaders.set("Connection", "keep-alive");
-
 		upstreamHeaders.set("Accept", "*/*");
 		upstreamHeaders.set("Referer", `${targetUrl.origin}/`);
 		upstreamHeaders.set("Origin", targetUrl.origin);
@@ -107,10 +94,7 @@ export async function GET(request: Request): Promise<Response> {
 			headers: upstreamHeaders,
 			cache: "no-store",
 			redirect: "follow",
-			signal: controller.signal,
 		});
-
-		clearTimeout(timeoutId);
 
 		if (!upstream.ok && upstream.status !== 206) {
 			const body = await upstream.text().catch(() => "");
@@ -126,7 +110,7 @@ export async function GET(request: Request): Promise<Response> {
 			);
 		}
 
-		const contentType = upstream.headers.get("content-type") || "application/octet-stream";
+		const contentType = upstream.headers.get("content-type") || "";
 		const isM3U8 =
 			target.toLowerCase().includes(".m3u8") ||
 			contentType.includes("application/vnd.apple.mpegurl") ||
