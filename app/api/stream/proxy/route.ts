@@ -1,0 +1,215 @@
+import { NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
+const REQUEST_TIMEOUT_MS = 15000;
+
+function isValidHttpUrl(value: string): boolean {
+	try {
+		const url = new URL(value);
+		return url.protocol === "http:" || url.protocol === "https:";
+	} catch {
+		return false;
+	}
+}
+
+function resolveUrl(value: string, upstreamUrl: string): string {
+	try {
+		return new URL(value, upstreamUrl).toString();
+	} catch {
+		return value;
+	}
+}
+
+function buildProxyUrl(targetUrl: string, requestUrl: string): string {
+	const url = new URL(requestUrl);
+	url.pathname = "/api/stream/proxy";
+	url.search = "";
+	url.searchParams.set("url", targetUrl);
+	return url.toString();
+}
+
+function isProbablyM3U8(target: string, contentType: string): boolean {
+	const normalized = contentType.toLowerCase();
+
+	return (
+		target.toLowerCase().includes(".m3u8") ||
+		normalized.includes("application/vnd.apple.mpegurl") ||
+		normalized.includes("application/x-mpegurl") ||
+		normalized.includes("audio/mpegurl")
+	);
+}
+
+function rewriteM3U8(content: string, upstreamUrl: string, requestUrl: string): string {
+	return content
+		.split(/\r?\n/)
+		.map((line) => {
+			const trimmed = line.trim();
+
+			if (!trimmed) {
+				return line;
+			}
+
+			if (trimmed.startsWith("#")) {
+				const uriMatch = line.match(/URI="([^"]+)"/);
+
+				if (uriMatch?.[1]) {
+					const absoluteUri = resolveUrl(uriMatch[1], upstreamUrl);
+					const proxiedUri = buildProxyUrl(absoluteUri, requestUrl);
+
+					return line.replace(`URI="${uriMatch[1]}"`, `URI="${proxiedUri}"`);
+				}
+
+				return line;
+			}
+
+			const absoluteUrl = resolveUrl(trimmed, upstreamUrl);
+			return buildProxyUrl(absoluteUrl, requestUrl);
+		})
+		.join("\n");
+}
+
+function copyHeaderIfPresent(source: Headers, target: Headers, name: string): void {
+	const value = source.get(name);
+	if (value) {
+		target.set(name, value);
+	}
+}
+
+function buildUpstreamHeaders(request: Request, target: string): Headers {
+	const headers = new Headers();
+	const targetUrl = new URL(target);
+
+	headers.set(
+		"User-Agent",
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
+	);
+	headers.set("Accept", request.headers.get("accept") || "*/*");
+	headers.set("Accept-Language", request.headers.get("accept-language") || "en-US,en;q=0.9");
+	headers.set("Origin", targetUrl.origin);
+	headers.set("Referer", `${targetUrl.origin}/`);
+	headers.set("Connection", "keep-alive");
+
+	const range = request.headers.get("range");
+	const ifRange = request.headers.get("if-range");
+
+	if (range) {
+		headers.set("Range", range);
+	}
+
+	if (ifRange) {
+		headers.set("If-Range", ifRange);
+	}
+
+	return headers;
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+	const controller = new AbortController();
+	const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+	try {
+		return await fetch(url, {
+			...init,
+			signal: controller.signal,
+		});
+	} finally {
+		clearTimeout(timeout);
+	}
+}
+
+export async function GET(request: Request): Promise<Response> {
+	try {
+		const requestUrl = new URL(request.url);
+		const target = requestUrl.searchParams.get("url")?.trim();
+
+		if (!target) {
+			return NextResponse.json({ error: "Missing stream URL." }, { status: 400 });
+		}
+
+		if (!isValidHttpUrl(target)) {
+			return NextResponse.json({ error: "Invalid stream URL." }, { status: 400 });
+		}
+
+		const upstreamHeaders = buildUpstreamHeaders(request, target);
+
+		const upstream = await fetchWithTimeout(
+			target,
+			{
+				method: "GET",
+				headers: upstreamHeaders,
+				redirect: "follow",
+				cache: "no-store",
+			},
+			REQUEST_TIMEOUT_MS,
+		);
+
+		if (!upstream.ok && upstream.status !== 206) {
+			const bodyPreview = await upstream.text().catch(() => "");
+
+			return NextResponse.json(
+				{
+					error: `Upstream returned ${upstream.status}`,
+					upstreamStatus: upstream.status,
+					bodyPreview: bodyPreview.slice(0, 500),
+					target,
+					finalUrl: upstream.url || target,
+				},
+				{ status: upstream.status },
+			);
+		}
+
+		const contentType = upstream.headers.get("content-type") || "";
+		const finalUrl = upstream.url || target;
+
+		if (isProbablyM3U8(finalUrl, contentType)) {
+			const manifest = await upstream.text();
+			const rewritten = rewriteM3U8(manifest, finalUrl, request.url);
+
+			const headers = new Headers();
+			headers.set("Content-Type", "application/vnd.apple.mpegurl");
+			headers.set("Cache-Control", "no-store");
+			headers.set("Access-Control-Allow-Origin", "*");
+
+			copyHeaderIfPresent(upstream.headers, headers, "etag");
+			copyHeaderIfPresent(upstream.headers, headers, "last-modified");
+
+			return new Response(rewritten, {
+				status: upstream.status,
+				headers,
+			});
+		}
+
+		const headers = new Headers();
+		headers.set("Cache-Control", "no-store");
+		headers.set("Access-Control-Allow-Origin", "*");
+
+		copyHeaderIfPresent(upstream.headers, headers, "content-type");
+		copyHeaderIfPresent(upstream.headers, headers, "content-length");
+		copyHeaderIfPresent(upstream.headers, headers, "content-range");
+		copyHeaderIfPresent(upstream.headers, headers, "accept-ranges");
+		copyHeaderIfPresent(upstream.headers, headers, "etag");
+		copyHeaderIfPresent(upstream.headers, headers, "last-modified");
+
+		return new Response(upstream.body, {
+			status: upstream.status,
+			headers,
+		});
+	} catch (error) {
+		const message =
+			error instanceof Error ? error.message : "Failed to proxy stream.";
+
+		const isAbort =
+			error instanceof Error &&
+			(error.name === "AbortError" || message.toLowerCase().includes("aborted"));
+
+		return NextResponse.json(
+			{
+				error: isAbort ? "Upstream request timed out." : message,
+			},
+			{ status: isAbort ? 504 : 500 },
+		);
+	}
+}
