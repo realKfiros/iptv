@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 function isValidHttpUrl(value: string): boolean {
 	try {
@@ -64,9 +66,11 @@ function copyHeaderIfPresent(from: Headers, to: Headers, name: string): void {
 }
 
 export async function GET(request: Request): Promise<Response> {
+	const startedAt = Date.now();
+
 	try {
-		const requestUrl = new URL(request.url);
-		const target = requestUrl.searchParams.get("url")?.trim();
+		const url = new URL(request.url);
+		const target = url.searchParams.get("url")?.trim();
 
 		if (!target) {
 			return NextResponse.json({ error: "Missing stream URL." }, { status: 400 });
@@ -86,6 +90,12 @@ export async function GET(request: Request): Promise<Response> {
 		if (range) upstreamHeaders.set("Range", range);
 		if (ifRange) upstreamHeaders.set("If-Range", ifRange);
 
+		console.log("[stream] fetch start", {
+			target,
+			accept,
+			range,
+		});
+
 		const upstream = await fetch(target, {
 			method: "GET",
 			headers: upstreamHeaders,
@@ -93,9 +103,28 @@ export async function GET(request: Request): Promise<Response> {
 			redirect: "follow",
 		});
 
+		console.log("[stream] fetch done", {
+			target,
+			status: upstream.status,
+			contentType: upstream.headers.get("content-type"),
+			contentLength: upstream.headers.get("content-length"),
+			durationMs: Date.now() - startedAt,
+			finalUrl: upstream.url,
+		});
+
 		if (!upstream.ok && upstream.status !== 206) {
+			const maybeText = await upstream.text().catch(() => "");
+			console.error("[stream] upstream bad response", {
+				target,
+				status: upstream.status,
+				bodyPreview: maybeText.slice(0, 500),
+			});
+
 			return NextResponse.json(
-				{ error: `Stream request failed with status ${upstream.status}` },
+				{
+					error: `Stream request failed with status ${upstream.status}`,
+					target,
+				},
 				{ status: 502 },
 			);
 		}
@@ -141,6 +170,8 @@ export async function GET(request: Request): Promise<Response> {
 			headers,
 		});
 	} catch (error) {
+		console.error("[stream] handler failed", error);
+
 		return NextResponse.json(
 			{
 				error: error instanceof Error ? error.message : "Failed to proxy stream.",
