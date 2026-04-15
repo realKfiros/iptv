@@ -83,7 +83,7 @@ export async function GET(request: Request): Promise<Response> {
 
 		upstreamHeaders.set(
 			"User-Agent",
-			"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
+			"Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:25.0) Gecko/20100101 Firefox/25.0",
 		);
 		upstreamHeaders.set("Accept", "*/*");
 		upstreamHeaders.set("Referer", `${targetUrl.origin}/`);
