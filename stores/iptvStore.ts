@@ -1,7 +1,5 @@
-import {action, computed, makeObservable, observable, runInAction} from "mobx";
-import type {Category, Channel, SourceType, XtreamCredentials} from "@/types/iptv";
-import {parseM3U} from "@/lib/m3u";
-import {loadXtreamLiveData} from "@/lib/xtream";
+import { action, computed, makeObservable, observable, runInAction } from "mobx";
+import type { Category, Channel, SourceType, XtreamCredentials } from "@/types/iptv";
 
 class IPTVStore {
 	@observable private _sourceType: SourceType = "playlist";
@@ -9,9 +7,10 @@ class IPTVStore {
 	@observable channels: Channel[] = [];
 	@observable selectedCategoryId = "all";
 	@observable selectedChannel: Channel | null = null;
-	loading = false;
+	@observable loading = false;
 	@observable error = "";
 	@observable playlistUrl = "";
+	@observable search = "";
 	@observable xtreamCredentials: XtreamCredentials = {
 		server: "",
 		username: "",
@@ -33,22 +32,48 @@ class IPTVStore {
 	}
 
 	@action.bound
+	setSearch(value: string): void {
+		this.search = value;
+	}
+
+	@action.bound
 	setXtreamField<K extends keyof XtreamCredentials>(key: K, value: XtreamCredentials[K]): void {
 		this.xtreamCredentials[key] = value;
 	}
 
+	@action.bound
+	setPlaylistUrl(value: string): void {
+		this.playlistUrl = value;
+	}
+
+	@action.bound
+	setSelectedCategoryId(value: string): void {
+		this.selectedCategoryId = value;
+	}
+
+	@action.bound
+	selectChannel(channel: Channel): void {
+		this.selectedChannel = channel;
+	}
+
 	@computed
 	get filteredChannels(): Channel[] {
-		if (this.selectedCategoryId === "all") {
-			return this.channels;
-		}
+		const search = this.search.trim().toLowerCase();
 
-		return this.channels.filter((channel) => channel.categoryId === this.selectedCategoryId);
+		return this.channels.filter((channel) => {
+			const matchesCategory =
+				this.selectedCategoryId === "all" || channel.categoryId === this.selectedCategoryId;
+
+			const matchesSearch =
+				!search || channel.name.toLowerCase().includes(search);
+
+			return matchesCategory && matchesSearch;
+		});
 	}
 
 	@computed
 	get visibleCategories(): Category[] {
-		return [{id: "all", name: "All"}, ...this.categories];
+		return [{ id: "all", name: "All" }, ...this.categories];
 	}
 
 	@action.bound
@@ -86,6 +111,7 @@ class IPTVStore {
 				this.categories = data.categories || [];
 				this.channels = data.channels || [];
 				this.selectedCategoryId = "all";
+				this.search = "";
 				this.selectedChannel = data.channels?.[0] || null;
 			});
 		} catch (error) {
@@ -134,6 +160,7 @@ class IPTVStore {
 				this.categories = data.categories || [];
 				this.channels = data.channels || [];
 				this.selectedCategoryId = "all";
+				this.search = "";
 				this.selectedChannel = data.channels?.[0] || null;
 			});
 		} catch (error) {

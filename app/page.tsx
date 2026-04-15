@@ -11,12 +11,21 @@ const Page = styled.main`
     grid-template-columns: 340px 1fr;
     background: #0f1115;
     color: #fff;
+
+    @media (max-width: 900px) {
+        grid-template-columns: 1fr;
+    }
 `;
 
 const Sidebar = styled.aside`
     border-right: 1px solid rgba(255, 255, 255, 0.08);
     padding: 1rem;
     overflow: auto;
+
+    @media (max-width: 900px) {
+        border-right: 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
 `;
 
 const Content = styled.section`
@@ -88,6 +97,16 @@ const CategoryButton = styled.button<{ $active: boolean }>`
     color: #fff;
 `;
 
+const SearchInput = styled.input`
+    width: 100%;
+    padding: 0.8rem 0.95rem;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: #0f1115;
+    color: #fff;
+    margin-top: 0.75rem;
+`;
+
 const ChannelList = styled.div`
     display: flex;
     flex-direction: column;
@@ -116,13 +135,13 @@ const ErrorText = styled.p`
 `;
 
 const Empty = styled.div`
-    display: grid;
-    place-items: center;
-    height: 100%;
-    min-height: 320px;
-    border-radius: 16px;
-    background: #171a21;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+	display: grid;
+	place-items: center;
+	height: 100%;
+	min-height: 320px;
+	border-radius: 16px;
+	background: #171a21;
+	border: 1px solid rgba(255, 255, 255, 0.08);
 `;
 
 const PlaylistForm = observer(() => {
@@ -131,7 +150,7 @@ const PlaylistForm = observer(() => {
 			<Input
 				placeholder="https://example.com/playlist.m3u"
 				value={iptvStore.playlistUrl}
-				onChange={(event) => iptvStore.playlistUrl = event.target.value}
+				onChange={(event) => iptvStore.setPlaylistUrl(event.target.value)}
 			/>
 			<Button onClick={iptvStore.loadFromPlaylistUrl} disabled={iptvStore.loading}>
 				{iptvStore.loading ? "Loading..." : "Load Playlist"}
@@ -146,18 +165,18 @@ const XtreamForm = observer(() => {
 			<Input
 				placeholder="https://server.example.com"
 				value={iptvStore.xtreamCredentials.server}
-				onChange={(event) => iptvStore.xtreamCredentials.server = event.target.value}
+				onChange={(event) => iptvStore.setXtreamField("server", event.target.value)}
 			/>
 			<Input
 				placeholder="Username"
 				value={iptvStore.xtreamCredentials.username}
-				onChange={(event) => iptvStore.xtreamCredentials.username = event.target.value}
+				onChange={(event) => iptvStore.setXtreamField("username", event.target.value)}
 			/>
 			<Input
 				type="password"
 				placeholder="Password"
 				value={iptvStore.xtreamCredentials.password}
-				onChange={(event) => iptvStore.xtreamCredentials.password = event.target.value}
+				onChange={(event) => iptvStore.setXtreamField("password", event.target.value)}
 			/>
 			<Button onClick={iptvStore.loadFromXtream} disabled={iptvStore.loading}>
 				{iptvStore.loading ? "Logging in..." : "Login with Xtream"}
@@ -174,13 +193,18 @@ const HomePage = observer(function HomePage() {
 					<Tabs>
 						<TabButton
 							$active={iptvStore.sourceType === "playlist"}
-							onClick={() => iptvStore.sourceType = "playlist"}
+							onClick={() => {
+								iptvStore.sourceType = "playlist";
+							}}
 						>
 							Playlist
 						</TabButton>
+
 						<TabButton
 							$active={iptvStore.sourceType === "xtream"}
-							onClick={() => iptvStore.sourceType = "xtream"}
+							onClick={() => {
+								iptvStore.sourceType = "xtream";
+							}}
 						>
 							Xtream
 						</TabButton>
@@ -199,12 +223,22 @@ const HomePage = observer(function HomePage() {
 									<CategoryButton
 										key={category.id}
 										$active={iptvStore.selectedCategoryId === category.id}
-										onClick={() => iptvStore.selectedCategoryId = category.id}
+										onClick={() => iptvStore.setSelectedCategoryId(category.id)}
 									>
 										{category.name}
 									</CategoryButton>
 								))}
 							</CategoryList>
+
+							<SearchInput
+								placeholder="Search channels..."
+								value={iptvStore.search}
+								onChange={(event) => iptvStore.setSearch(event.target.value)}
+							/>
+
+							<p style={{ opacity: 0.7, marginTop: "0.75rem", marginBottom: 0 }}>
+								{iptvStore.filteredChannels.length} channels
+							</p>
 						</Card>
 
 						<ChannelList>
@@ -212,7 +246,7 @@ const HomePage = observer(function HomePage() {
 								<ChannelButton
 									key={channel.id}
 									$active={iptvStore.selectedChannel?.id === channel.id}
-									onClick={() => iptvStore.selectedChannel = channel}
+									onClick={() => iptvStore.selectChannel(channel)}
 								>
 									<div>{channel.name}</div>
 									{channel.categoryName ? (
@@ -234,14 +268,12 @@ const HomePage = observer(function HomePage() {
 				</Card>
 
 				{iptvStore.selectedChannel ? (
-					<>
-						<Card>
-							<h2 style={{ marginTop: 0 }}>{iptvStore.selectedChannel.name}</h2>
-							<PlayerWrap>
-								<Player src={iptvStore.selectedChannel.streamUrl} />
-							</PlayerWrap>
-						</Card>
-					</>
+					<Card>
+						<h2 style={{ marginTop: 0 }}>{iptvStore.selectedChannel.name}</h2>
+						<PlayerWrap>
+							<Player src={iptvStore.selectedChannel.streamUrl} />
+						</PlayerWrap>
+					</Card>
 				) : (
 					<Empty>Select a playlist and choose a channel.</Empty>
 				)}
