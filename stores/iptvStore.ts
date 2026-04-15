@@ -62,22 +62,31 @@ class IPTVStore {
 		this.error = "";
 
 		try {
-			const response = await fetch(this.playlistUrl, {
-				cache: "no-store",
+			const response = await fetch("/api/playlist", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					url: this.playlistUrl,
+				}),
 			});
 
+			const data = (await response.json()) as {
+				categories?: Category[];
+				channels?: Channel[];
+				error?: string;
+			};
+
 			if (!response.ok) {
-				throw new Error(`Playlist request failed with status ${response.status}`);
+				throw new Error(data.error || "Failed to load playlist.");
 			}
 
-			const text = await response.text();
-			const {categories, channels} = parseM3U(text);
-
 			runInAction(() => {
-				this.categories = categories;
-				this.channels = channels;
+				this.categories = data.categories || [];
+				this.channels = data.channels || [];
 				this.selectedCategoryId = "all";
-				this.selectedChannel = channels[0] || null;
+				this.selectedChannel = data.channels?.[0] || null;
 			});
 		} catch (error) {
 			runInAction(() => {
@@ -92,7 +101,7 @@ class IPTVStore {
 
 	@action.bound
 	async loadFromXtream(): Promise<void> {
-		const {server, username, password} = this.xtreamCredentials;
+		const { server, username, password } = this.xtreamCredentials;
 
 		if (!server.trim() || !username.trim() || !password.trim()) {
 			this.error = "Please fill server, username and password.";
@@ -103,13 +112,29 @@ class IPTVStore {
 		this.error = "";
 
 		try {
-			const {categories, channels} = await loadXtreamLiveData(this.xtreamCredentials);
+			const response = await fetch("/api/xtream", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify(this.xtreamCredentials),
+			});
+
+			const data = (await response.json()) as {
+				categories?: Category[];
+				channels?: Channel[];
+				error?: string;
+			};
+
+			if (!response.ok) {
+				throw new Error(data.error || "Failed to login with Xtream.");
+			}
 
 			runInAction(() => {
-				this.categories = categories;
-				this.channels = channels;
+				this.categories = data.categories || [];
+				this.channels = data.channels || [];
 				this.selectedCategoryId = "all";
-				this.selectedChannel = channels[0] || null;
+				this.selectedChannel = data.channels?.[0] || null;
 			});
 		} catch (error) {
 			runInAction(() => {
