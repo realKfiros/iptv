@@ -5,7 +5,6 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const REQUEST_TIMEOUT_MS = 15000;
-const PROXY_PATH = "/api/stream/proxy";
 
 function isValidHttpUrl(value: string): boolean {
 	try {
@@ -24,25 +23,11 @@ function resolveUrl(value: string, upstreamUrl: string): string {
 	}
 }
 
-function isAlreadyProxied(value: string, requestUrl: string): boolean {
-	try {
-		const url = new URL(value, requestUrl);
-		return url.pathname === PROXY_PATH && url.searchParams.has("url");
-	} catch {
-		return false;
-	}
-}
-
-function buildProxyUrl(target: string, requestUrl: string, referer?: string): string {
+function buildProxyUrl(target: string, requestUrl: string): string {
 	const url = new URL(requestUrl);
-	url.pathname = PROXY_PATH;
+	url.pathname = "/api/stream/proxy";
 	url.search = "";
 	url.searchParams.set("url", target);
-
-	if (referer) {
-		url.searchParams.set("referer", referer);
-	}
-
 	return url.toString();
 }
 
@@ -69,23 +54,14 @@ function rewriteM3U8(content: string, upstreamUrl: string, requestUrl: string): 
 
 			if (trimmed.startsWith("#")) {
 				return line.replace(/URI="([^"]+)"/g, (_, uri: string) => {
-					if (isAlreadyProxied(uri, requestUrl)) {
-						return `URI="${uri}"`;
-					}
-
 					const absoluteUri = resolveUrl(uri, upstreamUrl);
-					const proxiedUri = buildProxyUrl(absoluteUri, requestUrl, upstreamUrl);
-
+					const proxiedUri = buildProxyUrl(absoluteUri, requestUrl);
 					return `URI="${proxiedUri}"`;
 				});
 			}
 
-			if (isAlreadyProxied(trimmed, requestUrl)) {
-				return trimmed;
-			}
-
 			const absoluteUrl = resolveUrl(trimmed, upstreamUrl);
-			return buildProxyUrl(absoluteUrl, requestUrl, upstreamUrl);
+			return buildProxyUrl(absoluteUrl, requestUrl);
 		})
 		.join("\n");
 }
@@ -97,40 +73,18 @@ function copyHeaderIfPresent(source: Headers, target: Headers, name: string): vo
 	}
 }
 
-function buildUpstreamHeaders(
-	request: Request,
-	target: string,
-	refererParam?: string | null,
-): Headers {
+function buildUpstreamHeaders(request: Request): Headers {
 	const headers = new Headers();
-	const targetUrl = new URL(target);
-
-	let referer = `${targetUrl.origin}/`;
-
-	if (refererParam?.trim()) {
-		try {
-			referer = decodeURIComponent(refererParam.trim());
-		} catch {
-			referer = refererParam.trim();
-		}
-	}
 
 	headers.set(
 		"User-Agent",
 		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
 	);
+
 	headers.set("Accept", request.headers.get("accept") || "*/*");
-	headers.set(
-		"Accept-Language",
-		request.headers.get("accept-language") || "en-US,en;q=0.9",
-	);
-	headers.set("Origin", targetUrl.origin);
-	headers.set("Referer", referer);
-	headers.set("Connection", "keep-alive");
 
 	const range = request.headers.get("range");
 	const ifRange = request.headers.get("if-range");
-	const acceptEncoding = request.headers.get("accept-encoding");
 
 	if (range) {
 		headers.set("Range", range);
@@ -138,10 +92,6 @@ function buildUpstreamHeaders(
 
 	if (ifRange) {
 		headers.set("If-Range", ifRange);
-	}
-
-	if (acceptEncoding) {
-		headers.set("Accept-Encoding", acceptEncoding);
 	}
 
 	return headers;
@@ -174,7 +124,7 @@ async function fetchUpstream(
 		target,
 		{
 			method: "GET",
-			headers: buildUpstreamHeaders(request, target, refererParam),
+			headers: buildUpstreamHeaders(request),
 			redirect: "follow",
 			cache: "no-store",
 		},
@@ -182,7 +132,7 @@ async function fetchUpstream(
 	);
 
 	if (upstream.status === 403 && refererParam) {
-		const retryHeaders = buildUpstreamHeaders(request, target, null);
+		const retryHeaders = buildUpstreamHeaders(request);
 		retryHeaders.delete("Referer");
 
 		upstream = await fetchWithTimeout(
