@@ -84,28 +84,23 @@ export async function GET(request: Request): Promise<Response> {
 		}
 
 		const upstreamHeaders = new Headers();
+		upstreamHeaders.set(
+			"User-Agent",
+			"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
+		);
+		upstreamHeaders.set("Accept", "*/*");
+
+		const targetUrl = new URL(target);
+		upstreamHeaders.set("Referer", `${targetUrl.origin}/`);
+		upstreamHeaders.set("Origin", targetUrl.origin);
 		const accept = request.headers.get("accept");
 		const range = request.headers.get("range");
-		const ifRange = request.headers.get("if-range");
 
 		upstreamHeaders.set("Connection", "keep-alive");
 
-		upstreamHeaders.set("User-Agent", "Mozilla/5.0 IPTV Player");
-		if (accept) {
-			upstreamHeaders.set("Accept", accept);
-		}
-		if (range) {
-			upstreamHeaders.set("Range", range);
-		}
-		if (ifRange) {
-			upstreamHeaders.set("If-Range", ifRange);
-		}
-
-		console.log("[stream] fetch start", {
-			target,
-			accept,
-			range,
-		});
+		upstreamHeaders.set("Accept", "*/*");
+		upstreamHeaders.set("Referer", `${targetUrl.origin}/`);
+		upstreamHeaders.set("Origin", targetUrl.origin);
 
 		const upstream = await fetch(target, {
 			method: "GET",
@@ -117,29 +112,17 @@ export async function GET(request: Request): Promise<Response> {
 
 		clearTimeout(timeoutId);
 
-		console.log("[stream] fetch done", {
-			target,
-			status: upstream.status,
-			contentType: upstream.headers.get("content-type"),
-			contentLength: upstream.headers.get("content-length"),
-			durationMs: Date.now() - startedAt,
-			finalUrl: upstream.url,
-		});
-
 		if (!upstream.ok && upstream.status !== 206) {
-			const maybeText = await upstream.text().catch(() => "");
-			console.error("[stream] upstream bad response", {
-				target,
-				status: upstream.status,
-				bodyPreview: maybeText.slice(0, 500),
-			});
+			const body = await upstream.text().catch(() => "");
 
 			return NextResponse.json(
 				{
-					error: `Stream request failed with status ${upstream.status}`,
+					error: `Upstream returned ${upstream.status}`,
+					upstreamStatus: upstream.status,
+					bodyPreview: body.slice(0, 500),
 					target,
 				},
-				{ status: 502 },
+				{ status: upstream.status },
 			);
 		}
 
