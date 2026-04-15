@@ -68,6 +68,9 @@ function copyHeaderIfPresent(from: Headers, to: Headers, name: string): void {
 export async function GET(request: Request): Promise<Response> {
 	const startedAt = Date.now();
 
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => controller.abort(), 10000);
+
 	try {
 		const url = new URL(request.url);
 		const target = url.searchParams.get("url")?.trim();
@@ -85,10 +88,18 @@ export async function GET(request: Request): Promise<Response> {
 		const range = request.headers.get("range");
 		const ifRange = request.headers.get("if-range");
 
+		upstreamHeaders.set("Connection", "keep-alive");
+
 		upstreamHeaders.set("User-Agent", "Mozilla/5.0 IPTV Player");
-		if (accept) upstreamHeaders.set("Accept", accept);
-		if (range) upstreamHeaders.set("Range", range);
-		if (ifRange) upstreamHeaders.set("If-Range", ifRange);
+		if (accept) {
+			upstreamHeaders.set("Accept", accept);
+		}
+		if (range) {
+			upstreamHeaders.set("Range", range);
+		}
+		if (ifRange) {
+			upstreamHeaders.set("If-Range", ifRange);
+		}
 
 		console.log("[stream] fetch start", {
 			target,
@@ -101,7 +112,10 @@ export async function GET(request: Request): Promise<Response> {
 			headers: upstreamHeaders,
 			cache: "no-store",
 			redirect: "follow",
+			signal: controller.signal,
 		});
+
+		clearTimeout(timeoutId);
 
 		console.log("[stream] fetch done", {
 			target,
@@ -129,7 +143,7 @@ export async function GET(request: Request): Promise<Response> {
 			);
 		}
 
-		const contentType = upstream.headers.get("content-type") || "";
+		const contentType = upstream.headers.get("content-type") || "application/octet-stream";
 		const isM3U8 =
 			target.toLowerCase().includes(".m3u8") ||
 			contentType.includes("application/vnd.apple.mpegurl") ||
